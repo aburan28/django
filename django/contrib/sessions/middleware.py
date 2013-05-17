@@ -4,11 +4,24 @@ from django.conf import settings
 from django.utils.cache import patch_vary_headers
 from django.utils.http import cookie_date
 from django.utils.importlib import import_module
+from hashlib import sha1
+import redis
+class RedisConn(object):
+    def connection(self):
+        self.conn = redis.StrictRedis(host=settings.REDIS_HOST,port=settings.REDIS_PORT,password=settings.REDIS_PASSWORD,db=settings.REDIS_DB)
+        
 
 class SessionMiddleware(object):
     def process_request(self, request):
         engine = import_module(settings.SESSION_ENGINE)
-        session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME, None)
+        
+        """
+        Retrieve the hashed_session_key and lookup the pre-hashed session key in a in memory database for safety
+        """
+        hashed_session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME, None)
+        redis_conn = RedisConn.connection()
+        session_key = redis_conn.get(hashed_session_key)
+        
         request.session = engine.SessionStore(session_key)
 
     def process_response(self, request, response):
@@ -36,8 +49,9 @@ class SessionMiddleware(object):
                 # Skip session save for 500 responses, refs #3881.
                 if response.status_code != 500:
                     request.session.save()
+                    hashed_session_key = sha1(request.session.session_key).hexdigest()
                     response.set_cookie(settings.SESSION_COOKIE_NAME,
-                            request.session.session_key, max_age=max_age,
+                            hashed_session_key, max_age=max_age,
                             expires=expires, domain=settings.SESSION_COOKIE_DOMAIN,
                             path=settings.SESSION_COOKIE_PATH,
                             secure=settings.SESSION_COOKIE_SECURE or None,
