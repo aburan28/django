@@ -1,5 +1,4 @@
 from __future__ import unicode_literals
-
 from django.db import models
 from django.contrib.sites.models import Site
 from django.core.urlresolvers import get_script_prefix
@@ -31,3 +30,18 @@ class FlatPage(models.Model):
     def get_absolute_url(self):
         # Handle script prefix manually because we bypass reverse()
         return iri_to_uri(get_script_prefix().rstrip('/') + self.url)
+
+class FlatPageRow(models.Model):
+    flat_page = models.ForeignKey(FlatPage)
+    row_title = models.CharField(max_length=150, blank=False)
+    row_type = models.CharField(max_length=15)
+    num_columns = models.IntegerField()
+    
+    
+    
+class FlatPageColumnType():
+    column_name = models.CharField(max_length=15,primary_key=True)
+    
+    
+    
+    
